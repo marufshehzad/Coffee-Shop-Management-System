@@ -2,7 +2,7 @@ using System;
 using System.Drawing;
 using System.Drawing.Drawing2D;
 using System.Windows.Forms;
-using Microsoft.Data.Sqlite;
+using Microsoft.Data.SqlClient;
 
 namespace CoffeeShopManagement.Forms
 {
@@ -13,12 +13,11 @@ namespace CoffeeShopManagement.Forms
         private TextBox txtStaffUser, txtStaffPass;
         private TextBox txtAdminUser, txtAdminPass;
 
-        // Color scheme
-        private readonly Color primaryColor = Color.FromArgb(101, 67, 33);      // Coffee brown
-        private readonly Color secondaryColor = Color.FromArgb(193, 154, 107);   // Light brown
-        private readonly Color accentColor = Color.FromArgb(255, 183, 77);       // Gold accent
-        private readonly Color bgColor = Color.FromArgb(245, 235, 220);          // Cream
-        private readonly Color darkBg = Color.FromArgb(62, 39, 18);              // Dark brown
+        private readonly Color primaryColor = Color.FromArgb(101, 67, 33);
+        private readonly Color secondaryColor = Color.FromArgb(193, 154, 107);
+        private readonly Color accentColor = Color.FromArgb(255, 183, 77);
+        private readonly Color bgColor = Color.FromArgb(245, 235, 220);
+        private readonly Color darkBg = Color.FromArgb(62, 39, 18);
         private readonly Color textLight = Color.White;
         private readonly Color textDark = Color.FromArgb(51, 33, 17);
 
@@ -29,19 +28,19 @@ namespace CoffeeShopManagement.Forms
 
         private void InitializeComponent()
         {
-            this.Text = "☕ Coffee Shop Management System";
-            this.Size = new Size(520, 600);
+            this.Text = "☕ Coffee Shop Marketplace";
+            this.Size = new Size(520, 620);
             this.StartPosition = FormStartPosition.CenterScreen;
             this.FormBorderStyle = FormBorderStyle.FixedSingle;
             this.MaximizeBox = false;
             this.BackColor = bgColor;
             this.Font = new Font("Segoe UI", 10);
 
-            // Header Panel
+            // Header Panel with gradient
             Panel headerPanel = new Panel
             {
                 Dock = DockStyle.Top,
-                Height = 120,
+                Height = 130,
                 BackColor = darkBg
             };
             headerPanel.Paint += (s, e) =>
@@ -53,11 +52,11 @@ namespace CoffeeShopManagement.Forms
 
             Label lblTitle = new Label
             {
-                Text = "☕ COFFEE SHOP",
-                Font = new Font("Segoe UI", 24, FontStyle.Bold),
+                Text = "☕ COFFEE MARKETPLACE",
+                Font = new Font("Segoe UI", 22, FontStyle.Bold),
                 ForeColor = accentColor,
                 AutoSize = false,
-                Size = new Size(500, 45),
+                Size = new Size(500, 40),
                 Location = new Point(10, 20),
                 TextAlign = ContentAlignment.MiddleCenter,
                 BackColor = Color.Transparent
@@ -65,42 +64,51 @@ namespace CoffeeShopManagement.Forms
 
             Label lblSubtitle = new Label
             {
-                Text = "Management System",
-                Font = new Font("Segoe UI", 14, FontStyle.Italic),
+                Text = "Multi-Vendor Management System",
+                Font = new Font("Segoe UI", 12, FontStyle.Italic),
                 ForeColor = secondaryColor,
                 AutoSize = false,
-                Size = new Size(500, 30),
-                Location = new Point(10, 65),
+                Size = new Size(500, 25),
+                Location = new Point(10, 60),
                 TextAlign = ContentAlignment.MiddleCenter,
                 BackColor = Color.Transparent
             };
 
-            headerPanel.Controls.AddRange(new Control[] { lblTitle, lblSubtitle });
+            Label lblTagline = new Label
+            {
+                Text = "🏪 5 Shops • 40+ Items • One Platform",
+                Font = new Font("Segoe UI", 9),
+                ForeColor = Color.FromArgb(200, 180, 150),
+                AutoSize = false,
+                Size = new Size(500, 20),
+                Location = new Point(10, 90),
+                TextAlign = ContentAlignment.MiddleCenter,
+                BackColor = Color.Transparent
+            };
+
+            headerPanel.Controls.AddRange(new Control[] { lblTitle, lblSubtitle, lblTagline });
 
             // Tab Control
             tabControl = new TabControl
             {
-                Location = new Point(30, 140),
-                Size = new Size(440, 350),
+                Location = new Point(30, 150),
+                Size = new Size(440, 360),
                 Font = new Font("Segoe UI", 11),
                 Padding = new Point(20, 8)
             };
 
-            // Customer Tab
             TabPage customerTab = CreateLoginTab("Customer Login",
                 out txtCustomerUser, out txtCustomerPass,
                 "Login", "Sign Up",
                 BtnCustomerLogin_Click, BtnCustomerSignUp_Click);
             customerTab.Text = "☕ Customer";
 
-            // Staff Tab
             TabPage staffTab = CreateLoginTab("Staff Login",
                 out txtStaffUser, out txtStaffPass,
                 "Login", null,
                 BtnStaffLogin_Click, null);
             staffTab.Text = "👨‍🍳 Staff";
 
-            // Admin Tab
             TabPage adminTab = CreateLoginTab("Admin Login",
                 out txtAdminUser, out txtAdminPass,
                 "Login", null,
@@ -109,15 +117,14 @@ namespace CoffeeShopManagement.Forms
 
             tabControl.TabPages.AddRange(new[] { customerTab, staffTab, adminTab });
 
-            // Footer
             Label lblFooter = new Label
             {
-                Text = "© 2024 Coffee Shop Management System | OOP-2 Project",
+                Text = "© 2024 Coffee Shop Marketplace | OOP-2 Project | SQL Server Edition",
                 Font = new Font("Segoe UI", 8, FontStyle.Italic),
                 ForeColor = Color.FromArgb(150, 120, 90),
                 AutoSize = false,
                 Size = new Size(440, 30),
-                Location = new Point(30, 510),
+                Location = new Point(30, 530),
                 TextAlign = ContentAlignment.MiddleCenter
             };
 
@@ -129,11 +136,7 @@ namespace CoffeeShopManagement.Forms
             string loginBtnText, string? signUpBtnText,
             EventHandler loginHandler, EventHandler? signUpHandler)
         {
-            TabPage tab = new TabPage
-            {
-                BackColor = bgColor,
-                Padding = new Padding(20)
-            };
+            TabPage tab = new TabPage { BackColor = bgColor, Padding = new Padding(20) };
 
             Label lblHeader = new Label
             {
@@ -193,12 +196,11 @@ namespace CoffeeShopManagement.Forms
                     Text = "Don't have an account?",
                     Font = new Font("Segoe UI", 9),
                     ForeColor = Color.Gray,
-                    Location = new Point(110, 275),
+                    Location = new Point(110, 278),
                     AutoSize = true
                 };
 
-                Button btnSignUp = CreateStyledButton(signUpBtnText, new Point(120, 295), new Size(160, 35), secondaryColor);
-                btnSignUp.FlatAppearance.BorderColor = primaryColor;
+                Button btnSignUp = CreateStyledButton(signUpBtnText, new Point(120, 298), new Size(160, 35), secondaryColor);
                 btnSignUp.Click += signUpHandler;
 
                 tab.Controls.AddRange(new Control[] { lblNoAccount, btnSignUp });
@@ -221,16 +223,10 @@ namespace CoffeeShopManagement.Forms
                 Cursor = Cursors.Hand
             };
             btn.FlatAppearance.BorderSize = 0;
-            btn.Region = Region.FromHrgn(CreateRoundRectRgn(0, 0, size.Width, size.Height, 10, 10));
-
             btn.MouseEnter += (s, e) => btn.BackColor = ControlPaint.Light(bgColor, 0.2f);
             btn.MouseLeave += (s, e) => btn.BackColor = bgColor;
-
             return btn;
         }
-
-        [System.Runtime.InteropServices.DllImport("Gdi32.dll")]
-        private static extern IntPtr CreateRoundRectRgn(int x1, int y1, int x2, int y2, int cx, int cy);
 
         // ===== EVENT HANDLERS =====
 
@@ -241,14 +237,12 @@ namespace CoffeeShopManagement.Forms
 
             if (string.IsNullOrEmpty(username) || string.IsNullOrEmpty(password))
             {
-                MessageBox.Show("Please enter both username and password.",
-                    "Validation", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                MessageBox.Show("Please enter both username and password.", "Validation", MessageBoxButtons.OK, MessageBoxIcon.Warning);
                 return;
             }
 
             using var conn = DatabaseHelper.GetConnection();
-            var cmd = new SqliteCommand(
-                "SELECT UserId, FirstName, LastName FROM UserDetails WHERE Username=@u AND Password=@p", conn);
+            var cmd = new SqlCommand("SELECT UserId, FirstName, LastName FROM UserDetails WHERE Username=@u AND Password=@p", conn);
             cmd.Parameters.AddWithValue("@u", username);
             cmd.Parameters.AddWithValue("@p", password);
 
@@ -257,9 +251,7 @@ namespace CoffeeShopManagement.Forms
             {
                 int userId = reader.GetInt32(0);
                 string name = $"{reader.GetString(1)} {reader.GetString(2)}";
-                MessageBox.Show($"Welcome, {name}! ☕", "Login Successful",
-                    MessageBoxButtons.OK, MessageBoxIcon.Information);
-
+                MessageBox.Show($"Welcome, {name}! ☕", "Login Successful", MessageBoxButtons.OK, MessageBoxIcon.Information);
                 this.Hide();
                 var dashboard = new CustomerDashboard(userId, name);
                 dashboard.FormClosed += (s, args) => this.Close();
@@ -267,8 +259,7 @@ namespace CoffeeShopManagement.Forms
             }
             else
             {
-                MessageBox.Show("Invalid username or password.",
-                    "Login Failed", MessageBoxButtons.OK, MessageBoxIcon.Error);
+                MessageBox.Show("Invalid username or password.", "Login Failed", MessageBoxButtons.OK, MessageBoxIcon.Error);
             }
         }
 
@@ -279,14 +270,12 @@ namespace CoffeeShopManagement.Forms
 
             if (string.IsNullOrEmpty(username) || string.IsNullOrEmpty(password))
             {
-                MessageBox.Show("Please enter both username and password.",
-                    "Validation", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                MessageBox.Show("Please enter both username and password.", "Validation", MessageBoxButtons.OK, MessageBoxIcon.Warning);
                 return;
             }
 
             using var conn = DatabaseHelper.GetConnection();
-            var cmd = new SqliteCommand(
-                "SELECT StaffId, FirstName, LastName, Role FROM Staff WHERE Username=@u AND Password=@p", conn);
+            var cmd = new SqlCommand("SELECT StaffId, FirstName, LastName, Role, ShopId FROM Staff WHERE Username=@u AND Password=@p", conn);
             cmd.Parameters.AddWithValue("@u", username);
             cmd.Parameters.AddWithValue("@p", password);
 
@@ -296,18 +285,16 @@ namespace CoffeeShopManagement.Forms
                 int staffId = reader.GetInt32(0);
                 string name = $"{reader.GetString(1)} {reader.GetString(2)}";
                 string role = reader.GetString(3);
-                MessageBox.Show($"Welcome, {name}! ({role}) 👨‍🍳", "Login Successful",
-                    MessageBoxButtons.OK, MessageBoxIcon.Information);
-
+                int shopId = reader.GetInt32(4);
+                MessageBox.Show($"Welcome, {name}! ({role}) 👨‍🍳", "Login Successful", MessageBoxButtons.OK, MessageBoxIcon.Information);
                 this.Hide();
-                var dashboard = new StaffDashboard(staffId, name, role);
+                var dashboard = new StaffDashboard(staffId, name, role, shopId);
                 dashboard.FormClosed += (s, args) => this.Close();
                 dashboard.Show();
             }
             else
             {
-                MessageBox.Show("Invalid username or password.",
-                    "Login Failed", MessageBoxButtons.OK, MessageBoxIcon.Error);
+                MessageBox.Show("Invalid username or password.", "Login Failed", MessageBoxButtons.OK, MessageBoxIcon.Error);
             }
         }
 
@@ -318,23 +305,19 @@ namespace CoffeeShopManagement.Forms
 
             if (string.IsNullOrEmpty(username) || string.IsNullOrEmpty(password))
             {
-                MessageBox.Show("Please enter both username and password.",
-                    "Validation", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                MessageBox.Show("Please enter both username and password.", "Validation", MessageBoxButtons.OK, MessageBoxIcon.Warning);
                 return;
             }
 
             using var conn = DatabaseHelper.GetConnection();
-            var cmd = new SqliteCommand(
-                "SELECT AdminId FROM Admin WHERE Username=@u AND Password=@p", conn);
+            var cmd = new SqlCommand("SELECT AdminId FROM Admin WHERE Username=@u AND Password=@p", conn);
             cmd.Parameters.AddWithValue("@u", username);
             cmd.Parameters.AddWithValue("@p", password);
 
             var result = cmd.ExecuteScalar();
             if (result != null)
             {
-                MessageBox.Show("Welcome, Admin! 🔒", "Login Successful",
-                    MessageBoxButtons.OK, MessageBoxIcon.Information);
-
+                MessageBox.Show("Welcome, Admin! 🔒", "Login Successful", MessageBoxButtons.OK, MessageBoxIcon.Information);
                 this.Hide();
                 var dashboard = new AdminDashboard();
                 dashboard.FormClosed += (s, args) => this.Close();
@@ -342,8 +325,7 @@ namespace CoffeeShopManagement.Forms
             }
             else
             {
-                MessageBox.Show("Invalid admin credentials.",
-                    "Login Failed", MessageBoxButtons.OK, MessageBoxIcon.Error);
+                MessageBox.Show("Invalid admin credentials.", "Login Failed", MessageBoxButtons.OK, MessageBoxIcon.Error);
             }
         }
 
