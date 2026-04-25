@@ -171,11 +171,19 @@ namespace CoffeeShopManagement.Forms
             ClearContent();
 
             // Header
-            Panel headerP = new Panel { Dock = DockStyle.Top, Height = 50, BackColor = Color.Transparent };
-            headerP.Controls.Add(new Label { Text = "🛒 My Orders", Font = new Font("Segoe UI", 22, FontStyle.Bold), ForeColor = primaryColor, AutoSize = true, Location = new Point(10, 5) });
+            Panel headerP = new Panel { Dock = DockStyle.Top, Height = 55, BackColor = Color.Transparent };
+            headerP.Controls.Add(new Label { Text = "🛒 My Orders", Font = new Font("Segoe UI", 22, FontStyle.Bold), ForeColor = primaryColor, AutoSize = true, Location = new Point(10, 8) });
 
-            // Scrollable order cards
-            FlowLayoutPanel orderFlow = new FlowLayoutPanel { Dock = DockStyle.Fill, AutoScroll = true, WrapContents = true, BackColor = Color.Transparent, Padding = new Padding(5) };
+            // Scrollable order cards — generous padding, single-column layout
+            FlowLayoutPanel orderFlow = new FlowLayoutPanel
+            {
+                Dock = DockStyle.Fill,
+                AutoScroll = true,
+                WrapContents = false,           // Single column — no side-by-side cards
+                FlowDirection = FlowDirection.TopDown,
+                BackColor = Color.Transparent,
+                Padding = new Padding(20, 10, 20, 10)
+            };
 
             using (var conn = DatabaseHelper.GetConnection())
             {
@@ -190,78 +198,202 @@ namespace CoffeeShopManagement.Forms
                 while (r.Read())
                 {
                     int oid = r.GetInt32(0); string shop = r.GetString(1);
-                    string date = r.GetDateTime(2).ToString("dd MMM, hh:mm tt");
+                    string date = r.GetDateTime(2).ToString("dd MMM yyyy, hh:mm tt");
                     decimal total = r.GetDecimal(3); string status = r.GetString(4);
                     decimal disc = r.IsDBNull(5) ? 0 : r.GetDecimal(5);
                     string promo = r.IsDBNull(6) ? "" : r.GetString(6);
                     string items = r.IsDBNull(7) ? "" : r.GetString(7);
 
-                    Panel card = new Panel { Size = new Size(orderFlow.Width > 100 ? orderFlow.Width - 45 : 750, 220), Margin = new Padding(5, 10, 5, 10), BackColor = Color.White };
-                    card.Paint += (s2, pe) => { pe.Graphics.DrawRectangle(new Pen(Color.FromArgb(225, 215, 200)), 0, 0, card.Width - 1, card.Height - 1); };
+                    // ═══ ORDER CARD — Height=300, generous layout ═══
+                    int cardW = Math.Max(contentPanel.Width - 100, 700);
+                    Panel card = new Panel
+                    {
+                        Size = new Size(cardW, 300),
+                        Margin = new Padding(5, 12, 5, 12),
+                        BackColor = Color.White,
+                        Anchor = AnchorStyles.Top | AnchorStyles.Left | AnchorStyles.Right
+                    };
+                    card.Paint += (s2, pe) =>
+                    {
+                        using var pen = new Pen(Color.FromArgb(215, 205, 190), 1);
+                        pe.Graphics.DrawRectangle(pen, 0, 0, card.Width - 1, card.Height - 1);
+                        // Top accent bar
+                        using var accent = new SolidBrush(primaryColor);
+                        pe.Graphics.FillRectangle(accent, 0, 0, card.Width, 4);
+                    };
 
-                    // Order info
-                    card.Controls.Add(new Label { Text = $"Order #{oid}", Font = new Font("Segoe UI", 14, FontStyle.Bold), ForeColor = primaryColor, Location = new Point(15, 8), AutoSize = true });
-                    card.Controls.Add(new Label { Text = $"🏪 {shop}  •  📅 {date}", Font = new Font("Segoe UI", 9), ForeColor = Color.Gray, Location = new Point(15, 32), AutoSize = true });
-                    card.Controls.Add(new Label { Text = items.Length > 80 ? items.Substring(0, 80) + "..." : items, Font = new Font("Segoe UI", 8.5f), ForeColor = Color.FromArgb(100, 80, 60), Location = new Point(15, 52), Size = new Size(500, 18) });
+                    // Row 1: Order title + action button (y = 12)
+                    card.Controls.Add(new Label
+                    {
+                        Text = $"Order #{oid}",
+                        Font = new Font("Segoe UI", 16, FontStyle.Bold),
+                        ForeColor = primaryColor,
+                        Location = new Point(20, 12),
+                        AutoSize = true
+                    });
 
-                    // Amount
-                    string amtText = disc > 0 ? $"৳{total:N0} (disc ৳{disc:N0})" : $"৳{total:N0}";
-                    card.Controls.Add(new Label { Text = amtText, Font = new Font("Segoe UI", 13, FontStyle.Bold), ForeColor = Color.FromArgb(76, 175, 80), Location = new Point(15, 72), AutoSize = true });
+                    // Row 2: Shop + Date (y = 42)
+                    card.Controls.Add(new Label
+                    {
+                        Text = $"🏪 {shop}   •   📅 {date}",
+                        Font = new Font("Segoe UI", 10),
+                        ForeColor = Color.Gray,
+                        Location = new Point(20, 42),
+                        AutoSize = true
+                    });
 
-                    // ═══ VISUAL ORDER TRACKER (Step Progress) ═══
+                    // Row 3: Item list (y = 68)
+                    string displayItems = items.Length > 100 ? items.Substring(0, 100) + "..." : items;
+                    card.Controls.Add(new Label
+                    {
+                        Text = $"📦 {displayItems}",
+                        Font = new Font("Segoe UI", 9.5f),
+                        ForeColor = Color.FromArgb(90, 70, 50),
+                        Location = new Point(20, 68),
+                        Size = new Size(cardW - 180, 22)
+                    });
+
+                    // Row 4: Amount (y = 95)
+                    string amtText = disc > 0
+                        ? $"💰 ৳{total:N0}  (discount ৳{disc:N0})"
+                        : $"💰 ৳{total:N0}";
+                    card.Controls.Add(new Label
+                    {
+                        Text = amtText,
+                        Font = new Font("Segoe UI", 14, FontStyle.Bold),
+                        ForeColor = Color.FromArgb(76, 175, 80),
+                        Location = new Point(20, 95),
+                        AutoSize = true
+                    });
+
+                    // ═══ VISUAL ORDER TRACKER (y = 135, height = 100) ═══
                     string[] stages = { "Awaiting\nApproval", "Confirmed", "Preparing", "Ready", "Paid" };
                     string[] stKeys = { "Awaiting Approval", "Confirmed", "Preparing", "Ready", "Paid" };
-                    Color[] stColors = { Color.FromArgb(255, 152, 0), Color.FromArgb(33, 150, 243), Color.FromArgb(156, 39, 176), Color.FromArgb(0, 150, 136), Color.FromArgb(76, 175, 80) };
+                    Color[] stColors = {
+                        Color.FromArgb(255, 152, 0),   // orange
+                        Color.FromArgb(33, 150, 243),   // blue
+                        Color.FromArgb(156, 39, 176),   // purple
+                        Color.FromArgb(0, 150, 136),    // teal
+                        Color.FromArgb(76, 175, 80)     // green
+                    };
                     int activeIdx = Array.IndexOf(stKeys, status);
                     if (status == "Completed") activeIdx = 4;
                     if (status == "Rejected" || status == "Cancelled") activeIdx = -1;
 
-                    Panel tracker = new Panel { Location = new Point(15, 100), Size = new Size(640, 75), BackColor = Color.FromArgb(252, 248, 240) };
+                    Panel tracker = new Panel
+                    {
+                        Location = new Point(20, 135),
+                        Size = new Size(Math.Min(cardW - 40, 700), 100),
+                        BackColor = Color.FromArgb(252, 248, 240),
+                        Anchor = AnchorStyles.Top | AnchorStyles.Left | AnchorStyles.Right
+                    };
                     tracker.Paint += (s2, pe) =>
                     {
-                        var g = pe.Graphics; g.SmoothingMode = SmoothingMode.AntiAlias;
-                        int stepW = 120;
+                        var g = pe.Graphics;
+                        g.SmoothingMode = SmoothingMode.AntiAlias;
+                        g.TextRenderingHint = System.Drawing.Text.TextRenderingHint.ClearTypeGridFit;
+
+                        // Border
+                        using var borderPen = new Pen(Color.FromArgb(235, 225, 210));
+                        g.DrawRectangle(borderPen, 0, 0, tracker.Width - 1, tracker.Height - 1);
+
+                        int stepW = (tracker.Width - 60) / Math.Max(stages.Length - 1, 1);
+                        int circleY = 20, circleR = 28;
+
                         for (int i = 0; i < stages.Length; i++)
                         {
                             int cx = 30 + i * stepW;
                             bool done = i <= activeIdx;
                             Color col = done ? stColors[Math.Min(i, stColors.Length - 1)] : Color.FromArgb(200, 200, 200);
 
-                            // Connector line
-                            if (i > 0) { using var lp = new Pen(done ? stColors[Math.Min(i - 1, stColors.Length - 1)] : Color.FromArgb(210, 210, 210), 3); g.DrawLine(lp, cx - stepW + 25, 14, cx - 5, 14); }
+                            // Connector line between circles
+                            if (i > 0)
+                            {
+                                int prevCx = 30 + (i - 1) * stepW;
+                                Color lineCol = done ? stColors[Math.Min(i - 1, stColors.Length - 1)] : Color.FromArgb(210, 210, 210);
+                                using var lp = new Pen(lineCol, 3);
+                                g.DrawLine(lp, prevCx + circleR / 2 + 2, circleY + circleR / 2, cx - circleR / 2 + 8, circleY + circleR / 2);
+                            }
 
                             // Circle
                             using var br = new SolidBrush(col);
-                            g.FillEllipse(br, cx - 10, 4, 22, 22);
-                            g.DrawString(done ? "✓" : $"{i + 1}", new Font("Segoe UI", 8, FontStyle.Bold), Brushes.White, cx - 6, 7);
+                            g.FillEllipse(br, cx - circleR / 2, circleY, circleR, circleR);
 
-                            // Label
+                            // Checkmark or number
+                            string mark = done ? "✓" : $"{i + 1}";
+                            var markFont = new Font("Segoe UI", 10, FontStyle.Bold);
+                            var markSize = g.MeasureString(mark, markFont);
+                            g.DrawString(mark, markFont, Brushes.White,
+                                cx - markSize.Width / 2 + 1, circleY + (circleR - markSize.Height) / 2);
+
+                            // Label below circle
                             var sf = new StringFormat { Alignment = StringAlignment.Center };
-                            g.DrawString(stages[i], new Font("Segoe UI", 7.5f), new SolidBrush(done ? col : Color.Gray), cx + 1, 32, sf);
+                            var labelFont = new Font("Segoe UI", 8.5f, done ? FontStyle.Bold : FontStyle.Regular);
+                            g.DrawString(stages[i], labelFont, new SolidBrush(done ? col : Color.Gray),
+                                cx, circleY + circleR + 6, sf);
                         }
                     };
                     card.Controls.Add(tracker);
 
-                    // Status badge / special states
+                    // Status badge for rejected/cancelled (y = 245)
                     if (status == "Rejected" || status == "Cancelled")
                     {
-                        card.Controls.Add(new Label { Text = $"❌ {status}", Font = new Font("Segoe UI", 12, FontStyle.Bold), ForeColor = Color.FromArgb(244, 67, 54), Location = new Point(15, 180), AutoSize = true });
+                        card.Controls.Add(new Label
+                        {
+                            Text = $"❌ {status}",
+                            Font = new Font("Segoe UI", 13, FontStyle.Bold),
+                            ForeColor = Color.FromArgb(244, 67, 54),
+                            Location = new Point(20, 248),
+                            AutoSize = true
+                        });
                     }
 
-                    // Pay button for unpaid
+                    // Current status text label (y = 248)
+                    if (status != "Rejected" && status != "Cancelled")
+                    {
+                        card.Controls.Add(new Label
+                        {
+                            Text = $"📌 Current Status: {status}",
+                            Font = new Font("Segoe UI", 10, FontStyle.Italic),
+                            ForeColor = Color.FromArgb(120, 100, 80),
+                            Location = new Point(20, 252),
+                            AutoSize = true
+                        });
+                    }
+
+                    // Action buttons — top-right corner
                     int capturedOid = oid;
                     if (status != "Paid" && status != "Completed" && status != "Cancelled" && status != "Rejected")
                     {
-                        Button bp = new Button { Text = "💳 Pay", Size = new Size(100, 34), Location = new Point(card.Width - 230, 12), Font = new Font("Segoe UI", 9, FontStyle.Bold), BackColor = Color.FromArgb(76, 175, 80), ForeColor = Color.White, FlatStyle = FlatStyle.Flat, Cursor = Cursors.Hand };
+                        Button bp = new Button
+                        {
+                            Text = "💳 Pay Now",
+                            Size = new Size(130, 40),
+                            Location = new Point(cardW - 170, 15),
+                            Font = new Font("Segoe UI", 11, FontStyle.Bold),
+                            BackColor = Color.FromArgb(76, 175, 80),
+                            ForeColor = Color.White,
+                            FlatStyle = FlatStyle.Flat,
+                            Cursor = Cursors.Hand
+                        };
                         bp.FlatAppearance.BorderSize = 0;
                         bp.Click += (s2, ev) => { new CheckoutForm(capturedOid, userId).ShowDialog(); ShowOrders(null, EventArgs.Empty); };
                         card.Controls.Add(bp);
                     }
 
-                    // Receipt button for paid orders
                     if (status == "Paid" || status == "Completed")
                     {
-                        Button br = new Button { Text = "🧾 Receipt", Size = new Size(100, 34), Location = new Point(card.Width - 230, 12), Font = new Font("Segoe UI", 9, FontStyle.Bold), BackColor = Color.FromArgb(33, 150, 243), ForeColor = Color.White, FlatStyle = FlatStyle.Flat, Cursor = Cursors.Hand };
+                        Button br = new Button
+                        {
+                            Text = "🧾 Receipt",
+                            Size = new Size(130, 40),
+                            Location = new Point(cardW - 170, 15),
+                            Font = new Font("Segoe UI", 11, FontStyle.Bold),
+                            BackColor = Color.FromArgb(33, 150, 243),
+                            ForeColor = Color.White,
+                            FlatStyle = FlatStyle.Flat,
+                            Cursor = Cursors.Hand
+                        };
                         br.FlatAppearance.BorderSize = 0;
                         br.Click += (s2, ev) => ViewReceipt(capturedOid);
                         card.Controls.Add(br);
