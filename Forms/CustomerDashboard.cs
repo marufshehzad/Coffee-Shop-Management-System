@@ -174,16 +174,15 @@ namespace CoffeeShopManagement.Forms
             Panel headerP = new Panel { Dock = DockStyle.Top, Height = 55, BackColor = Color.Transparent };
             headerP.Controls.Add(new Label { Text = "🛒 My Orders", Font = new Font("Segoe UI", 22, FontStyle.Bold), ForeColor = primaryColor, AutoSize = true, Location = new Point(10, 8) });
 
-            // Scrollable order cards — generous padding, single-column layout
-            FlowLayoutPanel orderFlow = new FlowLayoutPanel
+            // Scrollable order cards — use Panel (not FlowLayoutPanel) for reliable scrolling
+            Panel orderFlow = new Panel
             {
                 Dock = DockStyle.Fill,
                 AutoScroll = true,
-                WrapContents = false,           // Single column — no side-by-side cards
-                FlowDirection = FlowDirection.TopDown,
                 BackColor = Color.Transparent,
                 Padding = new Padding(20, 10, 20, 10)
             };
+            int cardY = 15; // Running Y position for stacking cards
 
             using (var conn = DatabaseHelper.GetConnection())
             {
@@ -205,11 +204,11 @@ namespace CoffeeShopManagement.Forms
                     string items = r.IsDBNull(7) ? "" : r.GetString(7);
 
                     // ═══ ORDER CARD — Height=300, generous layout ═══
-                    int cardW = Math.Max(contentPanel.Width - 100, 700);
+                    int cardW = Math.Max(orderFlow.ClientSize.Width - 50, 700);
                     Panel card = new Panel
                     {
+                        Location = new Point(15, cardY),
                         Size = new Size(cardW, 300),
-                        Margin = new Padding(5, 12, 5, 12),
                         BackColor = Color.White,
                         Anchor = AnchorStyles.Top | AnchorStyles.Left | AnchorStyles.Right
                     };
@@ -400,7 +399,22 @@ namespace CoffeeShopManagement.Forms
                     }
 
                     orderFlow.Controls.Add(card);
+                    cardY += 320; // card height (300) + gap (20)
                 }
+            }
+
+            // Empty state message if no orders found
+            if (cardY == 15)
+            {
+                orderFlow.Controls.Add(new Label
+                {
+                    Text = "📭  You haven't placed any orders yet.\n\nGo to Browse Shops → select a shop → add items to cart → place your order!",
+                    Font = new Font("Segoe UI", 14),
+                    ForeColor = Color.Gray,
+                    Location = new Point(50, 50),
+                    Size = new Size(600, 120),
+                    TextAlign = ContentAlignment.MiddleLeft
+                });
             }
 
             contentPanel.Controls.Add(orderFlow);
