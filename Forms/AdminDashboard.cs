@@ -10,6 +10,8 @@ namespace CoffeeShopManagement.Forms
     public class AdminDashboard : Form
     {
         private Panel contentPanel;
+        private Label? lblPendingBadge;
+        private System.Windows.Forms.Timer? notifTimer;
         private readonly Color primaryColor = Color.FromArgb(101, 67, 33);
         private readonly Color accentColor = Color.FromArgb(255, 183, 77);
         private readonly Color bgColor = Color.FromArgb(250, 243, 232);
@@ -38,10 +40,38 @@ namespace CoffeeShopManagement.Forms
             }
             contentPanel = new Panel { Dock = DockStyle.Fill, BackColor = bgColor, Padding = new Padding(20), AutoScroll = true };
             this.Controls.Add(contentPanel); this.Controls.Add(sidebar);
+
+            // ═══ NOTIFICATION TIMER — checks pending orders every 30s ═══
+            lblPendingBadge = new Label { Text = "", Font = new Font("Segoe UI", 9, FontStyle.Bold), ForeColor = Color.White, BackColor = Color.FromArgb(244, 67, 54), AutoSize = true, Visible = false, Padding = new Padding(4, 2, 4, 2) };
+            // Place badge on the Approvals button (index 1 in sidebar, after icon/title/divider = controls index 4)
+            if (sidebar.Controls.Count > 4) {
+                var approvalBtn = sidebar.Controls[4];
+                lblPendingBadge.Location = new Point(approvalBtn.Right - 45, approvalBtn.Top + 5);
+            }
+            sidebar.Controls.Add(lblPendingBadge);
+            lblPendingBadge.BringToFront();
+
+            notifTimer = new System.Windows.Forms.Timer { Interval = 30000 }; // 30 seconds
+            notifTimer.Tick += (s2, ev) => RefreshPendingBadge();
+            notifTimer.Start();
+            RefreshPendingBadge(); // Initial check
+
             ShowDash(null, EventArgs.Empty);
         }
 
         private void ClearContent() { contentPanel.Controls.Clear(); contentPanel.AutoScrollPosition = new Point(0, 0); }
+
+        private void RefreshPendingBadge()
+        {
+            try {
+                using var c = DatabaseHelper.GetConnection();
+                int count = (int)new SqlCommand("SELECT COUNT(*) FROM Orders WHERE Status='Awaiting Approval'", c).ExecuteScalar()!;
+                if (lblPendingBadge != null) {
+                    lblPendingBadge.Text = count > 0 ? $" {count} " : "";
+                    lblPendingBadge.Visible = count > 0;
+                }
+            } catch { /* silent — timer shouldn't crash the app */ }
+        }
         private Label Title(string t) => new Label { Text = t, Font = new Font("Segoe UI", 20, FontStyle.Bold), ForeColor = primaryColor, AutoSize = true, Location = new Point(20, 15) };
         private DataGridView MakeDGV(Point loc, Size sz) {
             var d = new DataGridView { Location = loc, Size = sz, BackgroundColor = Color.White, BorderStyle = BorderStyle.None, AutoSizeColumnsMode = DataGridViewAutoSizeColumnsMode.Fill, ReadOnly = true, AllowUserToAddRows = false, RowHeadersVisible = false, SelectionMode = DataGridViewSelectionMode.FullRowSelect, Font = new Font("Segoe UI", 9), Anchor = AnchorStyles.Top | AnchorStyles.Left | AnchorStyles.Right };
@@ -153,11 +183,12 @@ namespace CoffeeShopManagement.Forms
                 Color[] colors = { Color.FromArgb(0, 150, 136), Color.FromArgb(33, 150, 243), Color.FromArgb(255, 152, 0), Color.FromArgb(156, 39, 176), Color.FromArgb(244, 67, 54) };
 
                 for (int i = 0; i < shopSales.Count; i++) {
-                    int barH = (int)((double)shopSales[i].sales / (double)max * chartH);
+                    int barH = Math.Max(1, (int)((double)shopSales[i].sales / (double)max * chartH));
                     int x = 60 + i * (barW + 20);
-                    using var brush = new LinearGradientBrush(new Rectangle(x, baseY - barH, barW, barH), colors[i % colors.Length], ControlPaint.Light(colors[i % colors.Length], 0.3f), 90f);
-                    g.FillRectangle(brush, x, baseY - barH, barW, barH);
-                    g.DrawRectangle(new Pen(ControlPaint.Dark(colors[i % colors.Length], 0.2f)), x, baseY - barH, barW, barH);
+                    var rect = new Rectangle(x, baseY - barH, Math.Max(barW, 1), Math.Max(barH, 1));
+                    using var brush = new LinearGradientBrush(rect, colors[i % colors.Length], ControlPaint.Light(colors[i % colors.Length], 0.3f), 90f);
+                    g.FillRectangle(brush, rect);
+                    g.DrawRectangle(new Pen(ControlPaint.Dark(colors[i % colors.Length], 0.2f)), rect);
                     // Value on top
                     g.DrawString($"৳{shopSales[i].sales:N0}", new Font("Segoe UI", 8, FontStyle.Bold), new SolidBrush(colors[i % colors.Length]), x, baseY - barH - 18);
                     // Label below

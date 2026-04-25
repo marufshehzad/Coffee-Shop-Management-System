@@ -196,7 +196,7 @@ namespace CoffeeShopManagement.Forms
                     string promo = r.IsDBNull(6) ? "" : r.GetString(6);
                     string items = r.IsDBNull(7) ? "" : r.GetString(7);
 
-                    Panel card = new Panel { Size = new Size(orderFlow.Width > 100 ? orderFlow.Width - 45 : 750, 175), Margin = new Padding(5, 8, 5, 8), BackColor = Color.White };
+                    Panel card = new Panel { Size = new Size(orderFlow.Width > 100 ? orderFlow.Width - 45 : 750, 220), Margin = new Padding(5, 10, 5, 10), BackColor = Color.White };
                     card.Paint += (s2, pe) => { pe.Graphics.DrawRectangle(new Pen(Color.FromArgb(225, 215, 200)), 0, 0, card.Width - 1, card.Height - 1); };
 
                     // Order info
@@ -216,14 +216,14 @@ namespace CoffeeShopManagement.Forms
                     if (status == "Completed") activeIdx = 4;
                     if (status == "Rejected" || status == "Cancelled") activeIdx = -1;
 
-                    Panel tracker = new Panel { Location = new Point(15, 105), Size = new Size(580, 58), BackColor = Color.FromArgb(252, 248, 240) };
+                    Panel tracker = new Panel { Location = new Point(15, 100), Size = new Size(640, 75), BackColor = Color.FromArgb(252, 248, 240) };
                     tracker.Paint += (s2, pe) =>
                     {
                         var g = pe.Graphics; g.SmoothingMode = SmoothingMode.AntiAlias;
-                        int stepW = 110;
+                        int stepW = 120;
                         for (int i = 0; i < stages.Length; i++)
                         {
-                            int cx = 25 + i * stepW;
+                            int cx = 30 + i * stepW;
                             bool done = i <= activeIdx;
                             Color col = done ? stColors[Math.Min(i, stColors.Length - 1)] : Color.FromArgb(200, 200, 200);
 
@@ -237,7 +237,7 @@ namespace CoffeeShopManagement.Forms
 
                             // Label
                             var sf = new StringFormat { Alignment = StringAlignment.Center };
-                            g.DrawString(stages[i], new Font("Segoe UI", 7), new SolidBrush(done ? col : Color.Gray), cx + 1, 30, sf);
+                            g.DrawString(stages[i], new Font("Segoe UI", 7.5f), new SolidBrush(done ? col : Color.Gray), cx + 1, 32, sf);
                         }
                     };
                     card.Controls.Add(tracker);
@@ -245,7 +245,7 @@ namespace CoffeeShopManagement.Forms
                     // Status badge / special states
                     if (status == "Rejected" || status == "Cancelled")
                     {
-                        card.Controls.Add(new Label { Text = $"❌ {status}", Font = new Font("Segoe UI", 12, FontStyle.Bold), ForeColor = Color.FromArgb(244, 67, 54), Location = new Point(610, 110), AutoSize = true });
+                        card.Controls.Add(new Label { Text = $"❌ {status}", Font = new Font("Segoe UI", 12, FontStyle.Bold), ForeColor = Color.FromArgb(244, 67, 54), Location = new Point(15, 180), AutoSize = true });
                     }
 
                     // Pay button for unpaid
@@ -348,7 +348,7 @@ namespace CoffeeShopManagement.Forms
                     AND NOT EXISTS (SELECT 1 FROM ItemReview ir WHERE ir.UserId=@uid AND ir.ProductId=p.ProductId AND ir.OrderId=o.OrderId)", conn);
                 cmd.Parameters.AddWithValue("@uid", userId);
                 using var r = cmd.ExecuteReader();
-                while (r.Read()) cmbItems.Items.Add($"{r.GetInt32(2)}|{r.GetInt32(1)}|Order#{r.GetInt32(3)}|{r.GetString(2)}");
+                while (r.Read()) cmbItems.Items.Add($"{r.GetInt32(1)}|{r.GetInt32(3)}|{r.GetString(2)}");
             }
             if (cmbItems.Items.Count > 0) cmbItems.SelectedIndex = 0;
 
@@ -363,8 +363,8 @@ namespace CoffeeShopManagement.Forms
             {
                 if (cmbItems.SelectedItem == null) { MessageBox.Show("No items to review."); return; }
                 string[] parts = cmbItems.SelectedItem.ToString()!.Split('|');
-                int productId = int.Parse(parts[1]);
-                int orderId = int.Parse(parts[2].Replace("Order#", ""));
+                int productId = int.Parse(parts[0]);
+                int orderId = int.Parse(parts[1]);
                 int rating = cmbRating.SelectedIndex + 1;
 
                 using var conn = DatabaseHelper.GetConnection();
