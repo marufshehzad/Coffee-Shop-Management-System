@@ -29,7 +29,7 @@ namespace CoffeeShopManagement.Forms
             using (var c = DatabaseHelper.GetConnection()) { var cmd = new SqlCommand("SELECT ShopName FROM CoffeeShop WHERE ShopId=@s", c); cmd.Parameters.AddWithValue("@s", shopId); shopName = cmd.ExecuteScalar()?.ToString() ?? ""; }
 
             this.Text = $"👨‍🍳 {shopName} — {staffName} ({staffRole})";
-            this.Size = new Size(1050, 700); this.StartPosition = FormStartPosition.CenterScreen; this.BackColor = bgColor; this.Font = new Font("Segoe UI", 10);
+            this.Size = new Size(1050, 700); this.StartPosition = FormStartPosition.CenterScreen; this.WindowState = FormWindowState.Maximized; this.BackColor = bgColor; this.Font = new Font("Segoe UI", 10);
 
             Panel sidebar = new Panel { Dock = DockStyle.Left, Width = 220, BackColor = darkBg };
             sidebar.Paint += (s, e) => { using var b = new LinearGradientBrush(sidebar.ClientRectangle, darkBg, Color.FromArgb(78, 52, 28), 90f); e.Graphics.FillRectangle(b, sidebar.ClientRectangle); };
@@ -65,12 +65,12 @@ namespace CoffeeShopManagement.Forms
             int prods = 0, orders = 0, pending = 0, completed = 0; decimal rev = 0;
             using (var c = DatabaseHelper.GetConnection()) {
                 prods = (int)new SqlCommand($"SELECT COUNT(*) FROM Product WHERE ShopId={shopId}", c).ExecuteScalar()!;
-                orders = (int)new SqlCommand($"SELECT COUNT(*) FROM Orders WHERE ShopId={shopId}", c).ExecuteScalar()!;
-                pending = (int)new SqlCommand($"SELECT COUNT(*) FROM Orders WHERE ShopId={shopId} AND Status='Pending'", c).ExecuteScalar()!;
+                orders = (int)new SqlCommand($"SELECT COUNT(*) FROM Orders WHERE ShopId={shopId} AND Status NOT IN ('Awaiting Approval','Rejected')", c).ExecuteScalar()!;
+                pending = (int)new SqlCommand($"SELECT COUNT(*) FROM Orders WHERE ShopId={shopId} AND Status='Confirmed'", c).ExecuteScalar()!;
                 completed = (int)new SqlCommand($"SELECT COUNT(*) FROM Orders WHERE ShopId={shopId} AND Status='Completed'", c).ExecuteScalar()!;
-                rev = (decimal)new SqlCommand($"SELECT ISNULL(SUM(p.Amount),0) FROM Payment p JOIN Orders o ON p.OrderId=o.OrderId WHERE o.ShopId={shopId}", c).ExecuteScalar()!;
+                rev = (decimal)new SqlCommand($"SELECT ISNULL(SUM(p.FinalAmount),0) FROM Payment p JOIN Orders o ON p.OrderId=o.OrderId WHERE o.ShopId={shopId}", c).ExecuteScalar()!;
             }
-            var cards = new (string t, string v, Color c)[] { ("Products", prods.ToString(), Color.FromArgb(33, 150, 243)), ("Orders", orders.ToString(), Color.FromArgb(156, 39, 176)), ("Pending", pending.ToString(), Color.FromArgb(255, 152, 0)), ("Completed", completed.ToString(), Color.FromArgb(76, 175, 80)), ("Revenue", $"৳{rev:N0}", Color.FromArgb(0, 150, 136)) };
+            var cards = new (string t, string v, Color c)[] { ("Products", prods.ToString(), Color.FromArgb(33, 150, 243)), ("Orders", orders.ToString(), Color.FromArgb(156, 39, 176)), ("To Process", pending.ToString(), Color.FromArgb(255, 152, 0)), ("Completed", completed.ToString(), Color.FromArgb(76, 175, 80)), ("Revenue", $"৳{rev:N0}", Color.FromArgb(0, 150, 136)) };
             for (int i = 0; i < cards.Length; i++) {
                 Panel cd = new Panel { Size = new Size(145, 100), Location = new Point(20 + (i * 155), 60), BackColor = Color.White };
                 cd.Paint += (s2, pe) => { using var pen = new Pen(Color.FromArgb(230, 220, 200)); pe.Graphics.DrawRectangle(pen, 0, 0, ((Panel)s2!).Width - 1, ((Panel)s2!).Height - 1); };
@@ -108,13 +108,15 @@ namespace CoffeeShopManagement.Forms
         {
             ClearContent(); contentPanel.Controls.Add(Title("📋 Shop Orders"));
             ComboBox cmb = new ComboBox { Location = new Point(20, 55), Size = new Size(180, 30), Font = new Font("Segoe UI", 10), DropDownStyle = ComboBoxStyle.DropDownList };
-            cmb.Items.AddRange(new[] { "All", "Pending", "Preparing", "Ready", "Completed", "Paid", "Cancelled" }); cmb.SelectedIndex = 0;
+            cmb.Items.AddRange(new[] { "Confirmed (New)", "Preparing", "Ready", "Completed", "Paid", "Cancelled", "All" }); cmb.SelectedIndex = 0;
 
             DataGridView dgv = MakeDGV(new Point(20, 95), new Size(760, 320));
             Action load = () => {
                 using var c = DatabaseHelper.GetConnection();
-                string q = "SELECT o.OrderId AS [Order #], u.FirstName+' '+u.LastName AS Customer, o.OrderDate AS Date, o.TotalAmount AS [Total ৳], o.Status FROM Orders o LEFT JOIN UserDetails u ON o.UserId=u.UserId WHERE o.ShopId=@sid";
-                if (cmb.SelectedIndex > 0) q += $" AND o.Status='{cmb.SelectedItem}'";
+                string q = "SELECT o.OrderId AS [Order #], u.FirstName+' '+u.LastName AS Customer, o.OrderDate AS Date, o.TotalAmount AS [Total ৳], o.Status FROM Orders o LEFT JOIN UserDetails u ON o.UserId=u.UserId WHERE o.ShopId=@sid AND o.Status NOT IN ('Awaiting Approval','Rejected')";
+                string sel = cmb.SelectedItem?.ToString() ?? "";
+                if (sel == "Confirmed (New)") q += " AND o.Status='Confirmed'";
+                else if (sel != "All") q += $" AND o.Status='{sel}'";
                 q += " ORDER BY o.OrderId DESC";
                 var cmd = new SqlCommand(q, c); cmd.Parameters.AddWithValue("@sid", shopId);
                 var dt = new DataTable(); using var r = cmd.ExecuteReader(); dt.Load(r); dgv.DataSource = dt;
@@ -138,7 +140,7 @@ namespace CoffeeShopManagement.Forms
             ClearContent(); contentPanel.Controls.Add(Title("💰 Payments"));
             DataGridView dgv = MakeDGV(new Point(20, 60), new Size(760, 420));
             using (var c = DatabaseHelper.GetConnection()) {
-                var cmd = new SqlCommand("SELECT p.PaymentId AS [#], p.OrderId AS [Order], u.FirstName+' '+u.LastName AS Customer, p.PaymentDate AS Date, p.Amount AS [Amount ৳], p.PaymentMethod AS Method, ISNULL(p.PaymentProvider,'') AS Provider FROM Payment p JOIN Orders o ON p.OrderId=o.OrderId LEFT JOIN UserDetails u ON o.UserId=u.UserId WHERE o.ShopId=@sid ORDER BY p.PaymentId DESC", c);
+                var cmd = new SqlCommand("SELECT p.PaymentId AS [#], p.OrderId AS [Order], u.FirstName+' '+u.LastName AS Customer, p.PaymentDate AS Date, p.Amount AS [Original ৳], p.DiscountAmount AS [Discount ৳], p.FinalAmount AS [Paid ৳], p.PaymentMethod AS Method, ISNULL(p.PaymentProvider,'') AS Provider, ISNULL(p.PromoCode,'') AS Promo FROM Payment p JOIN Orders o ON p.OrderId=o.OrderId LEFT JOIN UserDetails u ON o.UserId=u.UserId WHERE o.ShopId=@sid ORDER BY p.PaymentId DESC", c);
                 cmd.Parameters.AddWithValue("@sid", shopId); var dt = new DataTable(); using var r = cmd.ExecuteReader(); dt.Load(r); dgv.DataSource = dt;
             }
             contentPanel.Controls.Add(dgv);

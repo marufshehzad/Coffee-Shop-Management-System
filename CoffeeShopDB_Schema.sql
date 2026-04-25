@@ -17,6 +17,7 @@ GO
 -- ============================================================
 -- DROP EXISTING TABLES (in correct FK order)
 -- ============================================================
+IF OBJECT_ID('dbo.PromoCode', 'U') IS NOT NULL DROP TABLE dbo.PromoCode;
 IF OBJECT_ID('dbo.ItemReview', 'U') IS NOT NULL DROP TABLE dbo.ItemReview;
 IF OBJECT_ID('dbo.Complaint', 'U') IS NOT NULL DROP TABLE dbo.Complaint;
 IF OBJECT_ID('dbo.Payment', 'U') IS NOT NULL DROP TABLE dbo.Payment;
@@ -121,12 +122,14 @@ GO
 -- TABLE: Orders (belongs to a CoffeeShop)
 -- ============================================================
 CREATE TABLE Orders (
-    OrderId      INT IDENTITY(1,1) PRIMARY KEY,
-    UserId       INT          NOT NULL,
-    ShopId       INT          NOT NULL,
-    OrderDate    DATETIME     DEFAULT GETDATE(),
-    TotalAmount  DECIMAL(10,2) DEFAULT 0,
-    Status       VARCHAR(20)  DEFAULT 'Pending',
+    OrderId        INT IDENTITY(1,1) PRIMARY KEY,
+    UserId         INT          NOT NULL,
+    ShopId         INT          NOT NULL,
+    OrderDate      DATETIME     DEFAULT GETDATE(),
+    TotalAmount    DECIMAL(10,2) DEFAULT 0,
+    DiscountAmount DECIMAL(10,2) DEFAULT 0,
+    PromoCode      VARCHAR(20)  NULL,
+    Status         VARCHAR(30)  DEFAULT 'Awaiting Approval',
     FOREIGN KEY (UserId) REFERENCES UserDetails(UserId),
     FOREIGN KEY (ShopId) REFERENCES CoffeeShop(ShopId)
 );
@@ -155,8 +158,11 @@ CREATE TABLE Payment (
     OrderId         INT          NOT NULL,
     PaymentDate     DATETIME     DEFAULT GETDATE(),
     Amount          DECIMAL(10,2) NOT NULL,
-    PaymentMethod   VARCHAR(30)  NOT NULL,    -- 'Cash', 'Credit Card', 'Debit Card', 'Mobile Banking'
-    PaymentProvider VARCHAR(30)  NULL,         -- 'bKash', 'Nagad', 'Rocket' (only for Mobile Banking)
+    DiscountAmount  DECIMAL(10,2) DEFAULT 0,
+    FinalAmount     DECIMAL(10,2) NOT NULL,
+    PaymentMethod   VARCHAR(30)  NOT NULL,
+    PaymentProvider VARCHAR(30)  NULL,
+    PromoCode       VARCHAR(20)  NULL,
     FOREIGN KEY (OrderId) REFERENCES Orders(OrderId)
 );
 GO
@@ -197,6 +203,17 @@ CREATE TABLE Complaint (
 );
 GO
 
+-- ============================================================
+-- TABLE: PromoCode (Discount Codes)
+-- ============================================================
+CREATE TABLE PromoCode (
+    PromoId       INT IDENTITY(1,1) PRIMARY KEY,
+    Code          VARCHAR(20)  NOT NULL UNIQUE,
+    DiscountPct   INT          NOT NULL CHECK (DiscountPct >= 1 AND DiscountPct <= 100),
+    IsActive      BIT          DEFAULT 1,
+    ExpiryDate    DATETIME     NULL
+);
+GO
 
 -- ============================================================
 -- SEED DATA
@@ -283,6 +300,11 @@ INSERT INTO Product (ShopId, CategoryId, ProductName, Description, Price, Stock)
 INSERT INTO UserDetails (FirstName, LastName, Email, Phone, Address, Username, Password) VALUES
     ('Test', 'Customer', 'test@email.com', '01700-000000', 'Dhaka, Bangladesh', 'customer1', 'pass123');
 
+-- Promo Codes
+INSERT INTO PromoCode (Code, DiscountPct) VALUES ('AIUB20', 20);
+INSERT INTO PromoCode (Code, DiscountPct) VALUES ('WELCOME10', 10);
+INSERT INTO PromoCode (Code, DiscountPct) VALUES ('COFFEE50', 50);
+
 GO
 
 -- ============================================================
@@ -297,7 +319,8 @@ UNION ALL SELECT 'Product',     COUNT(*) FROM Product
 UNION ALL SELECT 'Orders',      COUNT(*) FROM Orders
 UNION ALL SELECT 'Payment',     COUNT(*) FROM Payment
 UNION ALL SELECT 'ItemReview',  COUNT(*) FROM ItemReview
-UNION ALL SELECT 'Complaint',   COUNT(*) FROM Complaint;
+UNION ALL SELECT 'Complaint',   COUNT(*) FROM Complaint
+UNION ALL SELECT 'PromoCode',   COUNT(*) FROM PromoCode;
 GO
 
 PRINT '============================================================';

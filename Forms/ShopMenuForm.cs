@@ -368,7 +368,7 @@ namespace CoffeeShopManagement.Forms
                 using var conn = DatabaseHelper.GetConnection();
                 using var tx = conn.BeginTransaction();
                 var oc = new SqlCommand(
-                    "INSERT INTO Orders (UserId,ShopId,TotalAmount,Status) OUTPUT INSERTED.OrderId VALUES (@uid,@sid,@t,'Pending')",
+                    "INSERT INTO Orders (UserId,ShopId,TotalAmount,Status) OUTPUT INSERTED.OrderId VALUES (@uid,@sid,@t,'Awaiting Approval')",
                     conn, tx);
                 oc.Parameters.AddWithValue("@uid", userId);
                 oc.Parameters.AddWithValue("@sid", shopId);

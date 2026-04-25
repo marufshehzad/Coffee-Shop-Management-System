@@ -165,62 +165,156 @@ namespace CoffeeShopManagement.Forms
             menuForm.Show();
         }
 
-        // ===== MY ORDERS =====
+        // ===== MY ORDERS with Visual Tracker =====
         private void ShowOrders(object? sender, EventArgs e)
         {
             ClearContent();
-            contentPanel.Controls.Add(new Label { Text = "🛒 My Orders", Font = new Font("Segoe UI", 22, FontStyle.Bold), ForeColor = primaryColor, AutoSize = true, Location = new Point(10, 5) });
 
-            DataGridView dgv = CreateDGV(new Point(10, 50), new Size(contentPanel.Width - 70, 320));
-            dgv.Anchor = AnchorStyles.Top | AnchorStyles.Left | AnchorStyles.Right;
+            // Header
+            Panel headerP = new Panel { Dock = DockStyle.Top, Height = 50, BackColor = Color.Transparent };
+            headerP.Controls.Add(new Label { Text = "🛒 My Orders", Font = new Font("Segoe UI", 22, FontStyle.Bold), ForeColor = primaryColor, AutoSize = true, Location = new Point(10, 5) });
+
+            // Scrollable order cards
+            FlowLayoutPanel orderFlow = new FlowLayoutPanel { Dock = DockStyle.Fill, AutoScroll = true, WrapContents = true, BackColor = Color.Transparent, Padding = new Padding(5) };
 
             using (var conn = DatabaseHelper.GetConnection())
             {
-                var cmd = new SqlCommand(@"SELECT o.OrderId AS [Order #], s.ShopName AS [Shop], o.OrderDate AS [Date],
-                    o.TotalAmount AS [Total ৳], o.Status,
+                var cmd = new SqlCommand(@"SELECT o.OrderId, s.ShopName, o.OrderDate, o.TotalAmount, o.Status, o.DiscountAmount, o.PromoCode,
                     (SELECT STRING_AGG(p.ProductName + ' x' + CAST(od.Quantity AS VARCHAR), ', ')
-                     FROM OrderDetails od JOIN Product p ON od.ProductId=p.ProductId WHERE od.OrderId=o.OrderId) AS [Items]
+                     FROM OrderDetails od JOIN Product p ON od.ProductId=p.ProductId WHERE od.OrderId=o.OrderId) AS Items
                     FROM Orders o JOIN CoffeeShop s ON o.ShopId=s.ShopId
                     WHERE o.UserId=@uid ORDER BY o.OrderId DESC", conn);
                 cmd.Parameters.AddWithValue("@uid", userId);
-                var dt = new DataTable(); using var r = cmd.ExecuteReader(); dt.Load(r);
-                dgv.DataSource = dt;
-            }
-            contentPanel.Controls.Add(dgv);
+                using var r = cmd.ExecuteReader();
 
-            // Pay pending orders
-            Label lblPay = new Label { Text = "💳 Pay for Pending Orders", Font = new Font("Segoe UI", 14, FontStyle.Bold), ForeColor = primaryColor, Location = new Point(10, 385), AutoSize = true };
-            ComboBox cmbOrders = new ComboBox { Location = new Point(10, 420), Size = new Size(400, 30), Font = new Font("Segoe UI", 10), DropDownStyle = ComboBoxStyle.DropDownList };
+                while (r.Read())
+                {
+                    int oid = r.GetInt32(0); string shop = r.GetString(1);
+                    string date = r.GetDateTime(2).ToString("dd MMM, hh:mm tt");
+                    decimal total = r.GetDecimal(3); string status = r.GetString(4);
+                    decimal disc = r.IsDBNull(5) ? 0 : r.GetDecimal(5);
+                    string promo = r.IsDBNull(6) ? "" : r.GetString(6);
+                    string items = r.IsDBNull(7) ? "" : r.GetString(7);
+
+                    Panel card = new Panel { Size = new Size(orderFlow.Width > 100 ? orderFlow.Width - 45 : 750, 175), Margin = new Padding(5, 8, 5, 8), BackColor = Color.White };
+                    card.Paint += (s2, pe) => { pe.Graphics.DrawRectangle(new Pen(Color.FromArgb(225, 215, 200)), 0, 0, card.Width - 1, card.Height - 1); };
+
+                    // Order info
+                    card.Controls.Add(new Label { Text = $"Order #{oid}", Font = new Font("Segoe UI", 14, FontStyle.Bold), ForeColor = primaryColor, Location = new Point(15, 8), AutoSize = true });
+                    card.Controls.Add(new Label { Text = $"🏪 {shop}  •  📅 {date}", Font = new Font("Segoe UI", 9), ForeColor = Color.Gray, Location = new Point(15, 32), AutoSize = true });
+                    card.Controls.Add(new Label { Text = items.Length > 80 ? items.Substring(0, 80) + "..." : items, Font = new Font("Segoe UI", 8.5f), ForeColor = Color.FromArgb(100, 80, 60), Location = new Point(15, 52), Size = new Size(500, 18) });
+
+                    // Amount
+                    string amtText = disc > 0 ? $"৳{total:N0} (disc ৳{disc:N0})" : $"৳{total:N0}";
+                    card.Controls.Add(new Label { Text = amtText, Font = new Font("Segoe UI", 13, FontStyle.Bold), ForeColor = Color.FromArgb(76, 175, 80), Location = new Point(15, 72), AutoSize = true });
+
+                    // ═══ VISUAL ORDER TRACKER (Step Progress) ═══
+                    string[] stages = { "Awaiting\nApproval", "Confirmed", "Preparing", "Ready", "Paid" };
+                    string[] stKeys = { "Awaiting Approval", "Confirmed", "Preparing", "Ready", "Paid" };
+                    Color[] stColors = { Color.FromArgb(255, 152, 0), Color.FromArgb(33, 150, 243), Color.FromArgb(156, 39, 176), Color.FromArgb(0, 150, 136), Color.FromArgb(76, 175, 80) };
+                    int activeIdx = Array.IndexOf(stKeys, status);
+                    if (status == "Completed") activeIdx = 4;
+                    if (status == "Rejected" || status == "Cancelled") activeIdx = -1;
+
+                    Panel tracker = new Panel { Location = new Point(15, 105), Size = new Size(580, 58), BackColor = Color.FromArgb(252, 248, 240) };
+                    tracker.Paint += (s2, pe) =>
+                    {
+                        var g = pe.Graphics; g.SmoothingMode = SmoothingMode.AntiAlias;
+                        int stepW = 110;
+                        for (int i = 0; i < stages.Length; i++)
+                        {
+                            int cx = 25 + i * stepW;
+                            bool done = i <= activeIdx;
+                            Color col = done ? stColors[Math.Min(i, stColors.Length - 1)] : Color.FromArgb(200, 200, 200);
+
+                            // Connector line
+                            if (i > 0) { using var lp = new Pen(done ? stColors[Math.Min(i - 1, stColors.Length - 1)] : Color.FromArgb(210, 210, 210), 3); g.DrawLine(lp, cx - stepW + 25, 14, cx - 5, 14); }
+
+                            // Circle
+                            using var br = new SolidBrush(col);
+                            g.FillEllipse(br, cx - 10, 4, 22, 22);
+                            g.DrawString(done ? "✓" : $"{i + 1}", new Font("Segoe UI", 8, FontStyle.Bold), Brushes.White, cx - 6, 7);
+
+                            // Label
+                            var sf = new StringFormat { Alignment = StringAlignment.Center };
+                            g.DrawString(stages[i], new Font("Segoe UI", 7), new SolidBrush(done ? col : Color.Gray), cx + 1, 30, sf);
+                        }
+                    };
+                    card.Controls.Add(tracker);
+
+                    // Status badge / special states
+                    if (status == "Rejected" || status == "Cancelled")
+                    {
+                        card.Controls.Add(new Label { Text = $"❌ {status}", Font = new Font("Segoe UI", 12, FontStyle.Bold), ForeColor = Color.FromArgb(244, 67, 54), Location = new Point(610, 110), AutoSize = true });
+                    }
+
+                    // Pay button for unpaid
+                    int capturedOid = oid;
+                    if (status != "Paid" && status != "Completed" && status != "Cancelled" && status != "Rejected")
+                    {
+                        Button bp = new Button { Text = "💳 Pay", Size = new Size(100, 34), Location = new Point(card.Width - 230, 12), Font = new Font("Segoe UI", 9, FontStyle.Bold), BackColor = Color.FromArgb(76, 175, 80), ForeColor = Color.White, FlatStyle = FlatStyle.Flat, Cursor = Cursors.Hand };
+                        bp.FlatAppearance.BorderSize = 0;
+                        bp.Click += (s2, ev) => { new CheckoutForm(capturedOid, userId).ShowDialog(); ShowOrders(null, EventArgs.Empty); };
+                        card.Controls.Add(bp);
+                    }
+
+                    // Receipt button for paid orders
+                    if (status == "Paid" || status == "Completed")
+                    {
+                        Button br = new Button { Text = "🧾 Receipt", Size = new Size(100, 34), Location = new Point(card.Width - 230, 12), Font = new Font("Segoe UI", 9, FontStyle.Bold), BackColor = Color.FromArgb(33, 150, 243), ForeColor = Color.White, FlatStyle = FlatStyle.Flat, Cursor = Cursors.Hand };
+                        br.FlatAppearance.BorderSize = 0;
+                        br.Click += (s2, ev) => ViewReceipt(capturedOid);
+                        card.Controls.Add(br);
+                    }
+
+                    orderFlow.Controls.Add(card);
+                }
+            }
+
+            contentPanel.Controls.Add(orderFlow);
+            contentPanel.Controls.Add(headerP);
+        }
+
+        private void ViewReceipt(int oid)
+        {
+            // Re-use CheckoutForm's receipt logic via a lightweight viewer
+            string shopName = "", customerName = "", orderDate = "", method = "", provider = "", promo = "";
+            decimal amount = 0, discount = 0, finalAmt = 0;
+            var items = new System.Collections.Generic.List<(string n, int q, decimal p, decimal s)>();
 
             using (var conn = DatabaseHelper.GetConnection())
             {
-                var cmd = new SqlCommand(@"SELECT o.OrderId, o.TotalAmount, s.ShopName FROM Orders o
-                    JOIN CoffeeShop s ON o.ShopId=s.ShopId
-                    LEFT JOIN Payment p ON o.OrderId=p.OrderId
-                    WHERE o.UserId=@uid AND p.PaymentId IS NULL AND o.Status <> 'Cancelled' ORDER BY o.OrderId DESC", conn);
-                cmd.Parameters.AddWithValue("@uid", userId);
+                var cmd = new SqlCommand("SELECT s.ShopName, u.FirstName+' '+u.LastName, o.OrderDate, p.Amount, p.DiscountAmount, p.FinalAmount, p.PaymentMethod, ISNULL(p.PaymentProvider,''), ISNULL(p.PromoCode,'') FROM Payment p JOIN Orders o ON p.OrderId=o.OrderId JOIN CoffeeShop s ON o.ShopId=s.ShopId JOIN UserDetails u ON o.UserId=u.UserId WHERE o.OrderId=@oid", conn);
+                cmd.Parameters.AddWithValue("@oid", oid);
                 using var r = cmd.ExecuteReader();
-                while (r.Read()) cmbOrders.Items.Add($"Order #{r.GetInt32(0)} - {r.GetString(2)} - ৳{r.GetDecimal(1):N2}");
+                if (r.Read()) { shopName = r.GetString(0); customerName = r.GetString(1); orderDate = r.GetDateTime(2).ToString("dd MMM yyyy, hh:mm tt"); amount = r.GetDecimal(3); discount = r.GetDecimal(4); finalAmt = r.GetDecimal(5); method = r.GetString(6); provider = r.GetString(7); promo = r.GetString(8); }
+
+                var ic = new SqlCommand("SELECT p.ProductName, od.Quantity, od.UnitPrice, od.Subtotal FROM OrderDetails od JOIN Product p ON od.ProductId=p.ProductId WHERE od.OrderId=@oid", conn);
+                ic.Parameters.AddWithValue("@oid", oid);
+                using var ir = ic.ExecuteReader();
+                while (ir.Read()) items.Add((ir.GetString(0), ir.GetInt32(1), ir.GetDecimal(2), ir.GetDecimal(3)));
             }
-            if (cmbOrders.Items.Count > 0) cmbOrders.SelectedIndex = 0;
 
-            Button btnPay = new Button
+            Form receipt = new Form { Text = "🧾 Receipt", Size = new Size(480, 550), StartPosition = FormStartPosition.CenterScreen, FormBorderStyle = FormBorderStyle.FixedDialog, MaximizeBox = false, BackColor = Color.White, Font = new Font("Segoe UI", 10) };
+            Panel rp = new Panel { Location = new Point(15, 10), Size = new Size(430, 440), BackColor = Color.White };
+            rp.Paint += (s, pe) =>
             {
-                Text = "💳 Proceed to Payment", Location = new Point(430, 417), Size = new Size(200, 36),
-                Font = new Font("Segoe UI", 10, FontStyle.Bold), BackColor = Color.FromArgb(76, 175, 80),
-                ForeColor = Color.White, FlatStyle = FlatStyle.Flat, Cursor = Cursors.Hand
+                var g = pe.Graphics;
+                g.DrawRectangle(new Pen(Color.FromArgb(200, 190, 170), 2), 0, 0, rp.Width - 1, rp.Height - 1);
+                int y = 12;
+                g.DrawString("☕ " + shopName, new Font("Segoe UI", 16, FontStyle.Bold), new SolidBrush(primaryColor), 15, y); y += 30;
+                g.DrawString($"Receipt #INV-{oid:D4}  |  {orderDate}", new Font("Segoe UI", 9), Brushes.Gray, 15, y); y += 18;
+                g.DrawString($"Customer: {customerName}  |  {method}{(provider != "" ? $" ({provider})" : "")}", new Font("Segoe UI", 9), Brushes.Gray, 15, y); y += 25;
+                g.DrawString("───────────────────────────────", new Font("Segoe UI", 8), Brushes.LightGray, 15, y); y += 15;
+                foreach (var it in items) { g.DrawString($"  {it.n}  x{it.q}  ৳{it.p:N0}  =  ৳{it.s:N0}", new Font("Segoe UI", 9), Brushes.Black, 15, y); y += 19; }
+                y += 5; g.DrawString("───────────────────────────────", new Font("Segoe UI", 8), Brushes.LightGray, 15, y); y += 18;
+                g.DrawString($"Subtotal: ৳{amount:N2}", new Font("Segoe UI", 10), Brushes.Black, 15, y); y += 20;
+                if (discount > 0) { g.DrawString($"Discount ({promo}): -৳{discount:N2}", new Font("Segoe UI", 10), new SolidBrush(Color.FromArgb(244, 67, 54)), 15, y); y += 20; }
+                g.DrawString($"TOTAL: ৳{finalAmt:N2}", new Font("Segoe UI", 14, FontStyle.Bold), new SolidBrush(Color.FromArgb(76, 175, 80)), 15, y);
             };
-            btnPay.FlatAppearance.BorderSize = 0;
-            btnPay.Click += (s, ev) =>
-            {
-                if (cmbOrders.SelectedItem == null) { MessageBox.Show("No pending orders."); return; }
-                int orderId = int.Parse(cmbOrders.SelectedItem.ToString()!.Split('#')[1].Split('-')[0].Trim());
-                var payForm = new CheckoutForm(orderId, userId);
-                payForm.ShowDialog();
-                ShowOrders(null, EventArgs.Empty);
-            };
-
-            contentPanel.Controls.AddRange(new Control[] { lblPay, cmbOrders, btnPay });
+            Button bc = new Button { Text = "Close", Location = new Point(15, 460), Size = new Size(430, 38), Font = new Font("Segoe UI", 11, FontStyle.Bold), BackColor = primaryColor, ForeColor = Color.White, FlatStyle = FlatStyle.Flat }; bc.FlatAppearance.BorderSize = 0; bc.Click += (s, ev) => receipt.Close();
+            receipt.Controls.AddRange(new Control[] { rp, bc });
+            receipt.ShowDialog();
         }
 
         // ===== MY REVIEWS =====

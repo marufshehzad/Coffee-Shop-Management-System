@@ -107,7 +107,9 @@ namespace CoffeeShopManagement
                     ShopId       INT          NOT NULL,
                     OrderDate    DATETIME     DEFAULT GETDATE(),
                     TotalAmount  DECIMAL(10,2) DEFAULT 0,
-                    Status       VARCHAR(20)  DEFAULT 'Pending',
+                    DiscountAmount DECIMAL(10,2) DEFAULT 0,
+                    PromoCode    VARCHAR(20)  NULL,
+                    Status       VARCHAR(30)  DEFAULT 'Awaiting Approval',
                     FOREIGN KEY (UserId) REFERENCES UserDetails(UserId),
                     FOREIGN KEY (ShopId) REFERENCES CoffeeShop(ShopId)
                 );
@@ -130,8 +132,11 @@ namespace CoffeeShopManagement
                     OrderId         INT          NOT NULL,
                     PaymentDate     DATETIME     DEFAULT GETDATE(),
                     Amount          DECIMAL(10,2) NOT NULL,
+                    DiscountAmount  DECIMAL(10,2) DEFAULT 0,
+                    FinalAmount     DECIMAL(10,2) NOT NULL,
                     PaymentMethod   VARCHAR(30)  NOT NULL,
                     PaymentProvider VARCHAR(30)  NULL,
+                    PromoCode       VARCHAR(20)  NULL,
                     FOREIGN KEY (OrderId) REFERENCES Orders(OrderId)
                 );
 
@@ -164,6 +169,15 @@ namespace CoffeeShopManagement
                     FOREIGN KEY (ShopId) REFERENCES CoffeeShop(ShopId),
                     FOREIGN KEY (OrderId) REFERENCES Orders(OrderId)
                 );
+
+                IF NOT EXISTS (SELECT * FROM sys.tables WHERE name='PromoCode')
+                CREATE TABLE PromoCode (
+                    PromoId       INT IDENTITY(1,1) PRIMARY KEY,
+                    Code          VARCHAR(20)  NOT NULL UNIQUE,
+                    DiscountPct   INT          NOT NULL CHECK (DiscountPct >= 1 AND DiscountPct <= 100),
+                    IsActive      BIT          DEFAULT 1,
+                    ExpiryDate    DATETIME     NULL
+                );
             ";
 
             using var cmd = new SqlCommand(createTables, conn);
@@ -185,7 +199,7 @@ namespace CoffeeShopManagement
         {
             // Admin
             if (GetCount("Admin", conn) == 0)
-                Exec("INSERT INTO Admin (Username, Password) VALUES ('admin','admin123')", conn);
+                Exec("INSERT INTO Admin (Username, Password) VALUES ('maruf','1234')", conn);
 
             // Categories
             if (GetCount("Category", conn) == 0)
@@ -265,6 +279,14 @@ namespace CoffeeShopManagement
             // Sample customer
             if (GetCount("UserDetails", conn) == 0)
                 Exec("INSERT INTO UserDetails (FirstName,LastName,Email,Phone,Address,Username,Password) VALUES ('Test','Customer','test@email.com','01700-000000','Dhaka, Bangladesh','customer1','pass123')", conn);
+
+            // Promo Codes
+            if (GetCount("PromoCode", conn) == 0)
+            {
+                Exec("INSERT INTO PromoCode (Code, DiscountPct) VALUES ('AIUB20', 20)", conn);
+                Exec("INSERT INTO PromoCode (Code, DiscountPct) VALUES ('WELCOME10', 10)", conn);
+                Exec("INSERT INTO PromoCode (Code, DiscountPct) VALUES ('COFFEE50', 50)", conn);
+            }
         }
 
         private static int GetCount(string table, SqlConnection conn)
