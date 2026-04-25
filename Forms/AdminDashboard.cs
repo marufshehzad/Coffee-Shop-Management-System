@@ -12,6 +12,7 @@ namespace CoffeeShopManagement.Forms
         private Panel contentPanel;
         private Label? lblPendingBadge;
         private System.Windows.Forms.Timer? notifTimer;
+        private int lastPendingCount = 0;
         private readonly Color primaryColor = Color.FromArgb(101, 67, 33);
         private readonly Color accentColor = Color.FromArgb(255, 183, 77);
         private readonly Color bgColor = Color.FromArgb(250, 243, 232);
@@ -51,7 +52,7 @@ namespace CoffeeShopManagement.Forms
             sidebar.Controls.Add(lblPendingBadge);
             lblPendingBadge.BringToFront();
 
-            notifTimer = new System.Windows.Forms.Timer { Interval = 30000 }; // 30 seconds
+            notifTimer = new System.Windows.Forms.Timer { Interval = 15000 }; // 15 seconds
             notifTimer.Tick += (s2, ev) => RefreshPendingBadge();
             notifTimer.Start();
             RefreshPendingBadge(); // Initial check
@@ -70,6 +71,20 @@ namespace CoffeeShopManagement.Forms
                     lblPendingBadge.Text = count > 0 ? $" {count} " : "";
                     lblPendingBadge.Visible = count > 0;
                 }
+                // Popup notification when NEW orders arrive
+                if (count > lastPendingCount && lastPendingCount >= 0)
+                {
+                    int newOrders = count - lastPendingCount;
+                    this.BeginInvoke((Action)(() =>
+                    {
+                        MessageBox.Show(
+                            $"🔔 {newOrders} new order(s) awaiting approval!\n\nTotal pending: {count}\n\nGo to Approvals to confirm or cancel.",
+                            "📦 New Order Notification",
+                            MessageBoxButtons.OK,
+                            MessageBoxIcon.Information);
+                    }));
+                }
+                lastPendingCount = count;
             } catch { /* silent — timer shouldn't crash the app */ }
         }
         private Label Title(string t) => new Label { Text = t, Font = new Font("Segoe UI", 20, FontStyle.Bold), ForeColor = primaryColor, AutoSize = true, Location = new Point(20, 15) };
@@ -142,7 +157,28 @@ namespace CoffeeShopManagement.Forms
                 loadApprovals();
             };
 
-            Button btnConfirmAll = new Button { Text = "✅✅ Confirm ALL Pending", Location = new Point(620, 440), Size = new Size(250, 45), Font = new Font("Segoe UI", 12, FontStyle.Bold), BackColor = Color.FromArgb(0, 150, 136), ForeColor = Color.White, FlatStyle = FlatStyle.Flat, Cursor = Cursors.Hand };
+            Button btnCancel = new Button { Text = "🚫 Cancel Selected Order", Location = new Point(620, 440), Size = new Size(270, 45), Font = new Font("Segoe UI", 12, FontStyle.Bold), BackColor = Color.FromArgb(255, 152, 0), ForeColor = Color.White, FlatStyle = FlatStyle.Flat, Cursor = Cursors.Hand };
+            btnCancel.FlatAppearance.BorderSize = 0;
+            btnCancel.Click += (s2, ev) => {
+                if (dgv.SelectedRows.Count == 0) return;
+                int oid = Convert.ToInt32(dgv.SelectedRows[0].Cells["Order #"].Value);
+                if (MessageBox.Show($"Are you sure you want to CANCEL Order #{oid}?\n\nThis will restore stock and notify the customer.", "Cancel Order", MessageBoxButtons.YesNo, MessageBoxIcon.Warning) == DialogResult.Yes)
+                {
+                    using var c = DatabaseHelper.GetConnection();
+                    // Restore stock for cancelled items
+                    using var itemsR = new SqlCommand($"SELECT ProductId, Quantity FROM OrderDetails WHERE OrderId={oid}", c).ExecuteReader();
+                    var restoreItems = new System.Collections.Generic.List<(int pid, int qty)>();
+                    while (itemsR.Read()) restoreItems.Add((itemsR.GetInt32(0), itemsR.GetInt32(1)));
+                    itemsR.Close();
+                    foreach (var item in restoreItems)
+                        new SqlCommand($"UPDATE Product SET Stock=Stock+{item.qty} WHERE ProductId={item.pid}", c).ExecuteNonQuery();
+                    new SqlCommand($"UPDATE Orders SET Status='Cancelled' WHERE OrderId={oid}", c).ExecuteNonQuery();
+                    MessageBox.Show($"Order #{oid} cancelled. Stock has been restored.", "Cancelled", MessageBoxButtons.OK, MessageBoxIcon.Information);
+                    loadApprovals(); RefreshPendingBadge();
+                }
+            };
+
+            Button btnConfirmAll = new Button { Text = "✅✅ Confirm ALL Pending", Location = new Point(20, 500), Size = new Size(280, 45), Font = new Font("Segoe UI", 12, FontStyle.Bold), BackColor = Color.FromArgb(0, 150, 136), ForeColor = Color.White, FlatStyle = FlatStyle.Flat, Cursor = Cursors.Hand };
             btnConfirmAll.FlatAppearance.BorderSize = 0;
             btnConfirmAll.Click += (s2, ev) => {
                 using var c = DatabaseHelper.GetConnection();
@@ -150,10 +186,10 @@ namespace CoffeeShopManagement.Forms
                 if (count == 0) { MessageBox.Show("No pending orders."); return; }
                 new SqlCommand("UPDATE Orders SET Status='Confirmed' WHERE Status='Awaiting Approval'", c).ExecuteNonQuery();
                 MessageBox.Show($"All {count} orders confirmed! ✅", "Bulk Approved", MessageBoxButtons.OK, MessageBoxIcon.Information);
-                loadApprovals();
+                loadApprovals(); RefreshPendingBadge();
             };
 
-            contentPanel.Controls.AddRange(new Control[] { dgv, btnConfirm, btnReject, btnConfirmAll });
+            contentPanel.Controls.AddRange(new Control[] { dgv, btnConfirm, btnReject, btnCancel, btnConfirmAll });
         }
 
         // ═══ ANALYTICS (GDI+ Bar Chart) ═══

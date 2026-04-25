@@ -282,9 +282,8 @@ namespace CoffeeShopManagement.Forms
                     Panel tracker = new Panel
                     {
                         Location = new Point(20, 135),
-                        Size = new Size(Math.Min(cardW - 40, 700), 100),
-                        BackColor = Color.FromArgb(252, 248, 240),
-                        Anchor = AnchorStyles.Top | AnchorStyles.Left | AnchorStyles.Right
+                        Size = new Size(620, 95),  // Fixed width — all 5 steps always visible
+                        BackColor = Color.FromArgb(252, 248, 240)
                     };
                     tracker.Paint += (s2, pe) =>
                     {
@@ -296,8 +295,8 @@ namespace CoffeeShopManagement.Forms
                         using var borderPen = new Pen(Color.FromArgb(235, 225, 210));
                         g.DrawRectangle(borderPen, 0, 0, tracker.Width - 1, tracker.Height - 1);
 
-                        int stepW = (tracker.Width - 60) / Math.Max(stages.Length - 1, 1);
-                        int circleY = 20, circleR = 28;
+                        int stepW = 135;  // Fixed spacing — fits 5 steps in ~620px
+                        int circleY = 15, circleR = 24;
 
                         for (int i = 0; i < stages.Length; i++)
                         {
