@@ -10,10 +10,10 @@ namespace CoffeeShopManagement
         // Option 1: LocalDB (comes with Visual Studio)
         // Option 2: SQL Server Express - change to: Server=.\SQLEXPRESS;...
         public static string ConnectionString =>
-            @"Server=(localdb)\MSSQLLocalDB;Database=CoffeeShopDB;Trusted_Connection=True;TrustServerCertificate=True;";
+            @"Server=.\SQLEXPRESS;Database=CoffeeShopDB;Trusted_Connection=True;TrustServerCertificate=True;";
 
         private static string MasterConnectionString =>
-            @"Server=(localdb)\MSSQLLocalDB;Database=master;Trusted_Connection=True;TrustServerCertificate=True;";
+            @"Server=.\SQLEXPRESS;Database=master;Trusted_Connection=True;TrustServerCertificate=True;";
 
         public static SqlConnection GetConnection()
         {

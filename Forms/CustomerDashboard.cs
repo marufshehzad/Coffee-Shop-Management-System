@@ -32,9 +32,10 @@ namespace CoffeeShopManagement.Forms
             this.Text = $"☕ Coffee Marketplace - {customerName}";
             this.Size = new Size(1100, 750);
             this.StartPosition = FormStartPosition.CenterScreen;
+            this.WindowState = FormWindowState.Maximized;
             this.BackColor = bgColor;
             this.Font = new Font("Segoe UI", 10);
-            this.MinimumSize = new Size(1000, 650);
+            this.MinimumSize = new Size(900, 600);
 
             // Sidebar
             Panel sidebar = new Panel { Dock = DockStyle.Left, Width = 230, BackColor = darkBg };
@@ -78,15 +79,21 @@ namespace CoffeeShopManagement.Forms
         private void ShowShops(object? sender, EventArgs e)
         {
             ClearContent();
+
+            // Header panel docked to top
+            Panel headerPanel = new Panel { Dock = DockStyle.Top, Height = 65, BackColor = Color.Transparent };
             Label title = new Label { Text = "🏪 Explore Coffee Shops", Font = new Font("Segoe UI", 22, FontStyle.Bold), ForeColor = primaryColor, AutoSize = true, Location = new Point(10, 5) };
             Label subtitle = new Label { Text = "Choose a shop to browse their menu and place an order", Font = new Font("Segoe UI", 10), ForeColor = Color.Gray, AutoSize = true, Location = new Point(12, 42) };
-            contentPanel.Controls.AddRange(new Control[] { title, subtitle });
+            headerPanel.Controls.AddRange(new Control[] { title, subtitle });
 
+            // Shop grid docked to fill remaining space
             FlowLayoutPanel shopGrid = new FlowLayoutPanel
             {
-                Location = new Point(10, 75), Size = new Size(contentPanel.Width - 60, contentPanel.Height - 100),
-                AutoScroll = true, WrapContents = true, BackColor = Color.Transparent,
-                Anchor = AnchorStyles.Top | AnchorStyles.Left | AnchorStyles.Right | AnchorStyles.Bottom
+                Dock = DockStyle.Fill,
+                AutoScroll = true,
+                WrapContents = true,
+                BackColor = Color.Transparent,
+                Padding = new Padding(5)
             };
 
             using var conn = DatabaseHelper.GetConnection();
@@ -140,7 +147,10 @@ namespace CoffeeShopManagement.Forms
                 shopGrid.Controls.Add(card);
                 idx++;
             }
+
+            // Add Fill first, then Top (Dock ordering rule)
             contentPanel.Controls.Add(shopGrid);
+            contentPanel.Controls.Add(headerPanel);
         }
 
         private void OpenShopMenu(int shopId, string shopName)
